@@ -24,7 +24,14 @@ impl Node {
         }
     }
     pub fn get_as_string_line(&self) -> String {
-        self.path.file_name().map(|f| f.to_str()).flatten().unwrap_or_else(|| self.path.to_str().unwrap_or("??")).to_owned() + " == " + &file_size_to_str(self.size)
+        self.path
+            .file_name()
+            .map(|f| f.to_str())
+            .flatten()
+            .unwrap_or_else(|| self.path.to_str().unwrap_or("??"))
+            .to_owned()
+            + " == "
+            + &file_size_to_str(self.size)
     }
     pub fn get_as_string_tree(&self, depth: usize, size_filter: Option<u64>) -> (String, bool) {
         let mut passed_filter = if let Some(size_filter) = size_filter {
@@ -36,7 +43,12 @@ impl Node {
         result += " ";
         // Print full path of top node
         if depth == 0 {
-            result += self.path.parent().map(|p| p.to_str()).flatten().unwrap_or("");
+            result += self
+                .path
+                .parent()
+                .map(|p| p.to_str())
+                .flatten()
+                .unwrap_or("");
             result += "/";
         }
         result += &self.get_as_string_line();
@@ -48,7 +60,7 @@ impl Node {
                     result += &child_res.0;
                     passed_filter = true;
                 } else if child.size >= size_filter {
-                    result += &("––".repeat(depth+1) + " " + &child.get_as_string_line() + "\n");
+                    result += &("––".repeat(depth + 1) + " " + &child.get_as_string_line() + "\n");
                     passed_filter = true;
                 }
             } else {
