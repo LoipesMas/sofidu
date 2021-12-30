@@ -12,7 +12,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("depth")
-                .help("Depth of recursive walking")
+                .help("Depth of displayed tree")
                 .long("depth")
                 .default_value("-1")
                 .takes_value(true)
