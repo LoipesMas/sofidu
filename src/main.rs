@@ -47,7 +47,7 @@ fn main() {
     let matches = app.get_matches();
     let depth_input = matches.value_of("depth").unwrap();
     let depth = parse_depth(depth_input);
-    let path = matches.value_of("path").unwrap();
+    let path_str = matches.value_of("path").unwrap();
     let sort = matches.is_present("sort");
     let list = matches.is_present("list");
     let reverse = matches.is_present("reverse");
@@ -62,7 +62,13 @@ fn main() {
         }
     });
 
-    let mut node = sofidu::walk_dir(Path::new(path), depth, false);
+    let path = Path::new(path_str);
+    if !path.exists() || !path.is_dir() {
+        println!("Invalid path provided: {}", path_str);
+        std::process::exit(1);
+    }
+
+    let mut node = sofidu::walk_dir(path, depth, false);
     if sort {
         node.sort();
     }
