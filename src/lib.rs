@@ -46,42 +46,42 @@ impl Node {
         };
         string.to_string() + " " + &file_size_to_str(self.size).green().to_string()
     }
-    pub fn get_as_string_tree(&self, depth: usize, size_filter: Option<u64>) -> (String, bool) {
-        let mut passed_filter = if let Some(size_filter) = size_filter {
-            self.size >= size_filter
+    pub fn get_as_string_tree(&self, depth: usize, size_threshold: Option<u64>) -> (String, bool) {
+        let mut passed_threshold = if let Some(size_threshold) = size_threshold {
+            self.size >= size_threshold
         } else {
             true
         };
         let mut result = "| ".repeat(depth);
         result += &self.get_as_string_line(depth == 0);
         result += "\n";
-        let (results, passed_filters): (Vec<_>, Vec<_>) = self
+        let (results, passed_thresholds): (Vec<_>, Vec<_>) = self
             .children
             .par_iter()
             .map(|child| {
-                let child_res = child.get_as_string_tree(depth + 1, size_filter);
+                let child_res = child.get_as_string_tree(depth + 1, size_threshold);
                 let mut child_out = "".to_owned();
-                let mut passed_filter = false;
-                if let Some(size_filter) = size_filter {
+                let mut passed_threshold = false;
+                if let Some(size_threshold) = size_threshold {
                     if child_res.1 {
                         child_out += &child_res.0;
-                        passed_filter = true;
-                    } else if child.size >= size_filter {
+                        passed_threshold = true;
+                    } else if child.size >= size_threshold {
                         child_out += &("| ".repeat(depth + 1)
                             + " "
                             + &child.get_as_string_line(false)
                             + "\n");
-                        passed_filter = true;
+                        passed_threshold = true;
                     }
                 } else {
                     child_out += &child_res.0;
                 }
-                (child_out, passed_filter)
+                (child_out, passed_threshold)
             })
             .unzip();
         result = results.iter().fold(result, |fold, r| fold + r);
-        passed_filter |= passed_filters.par_iter().any(|&p| p);
-        (result, passed_filter)
+        passed_threshold |= passed_thresholds.par_iter().any(|&p| p);
+        (result, passed_threshold)
     }
     pub fn flatten(&self) -> Vec<Node> {
         let mut nodes = vec![self.clone_childless()];

@@ -37,11 +37,11 @@ fn main() {
                 .short("l"),
         )
         .arg(
-            Arg::with_name("size filter")
+            Arg::with_name("size threshold")
                 .help("Only show files with size bigger than this")
-                .long("size_filter")
+                .long("size_threshold")
                 .takes_value(true)
-                .short("f"),
+                .short("t"),
         );
 
     let matches = app.get_matches();
@@ -51,7 +51,7 @@ fn main() {
     let sort = matches.is_present("sort");
     let list = matches.is_present("list");
     let reverse = matches.is_present("reverse");
-    let size_filter = matches.value_of("size filter").map(|a| {
+    let size_threshold = matches.value_of("size threshold").map(|a| {
         let r = sofidu::str_to_file_size(a);
         match r {
             Ok(v) => v,
@@ -76,8 +76,8 @@ fn main() {
         let mut output = "".to_owned();
         let nodes = node.flatten();
         for node in nodes {
-            if let Some(size_filter) = size_filter {
-                if node.size < size_filter {
+            if let Some(size_threshold) = size_threshold {
+                if node.size < size_threshold {
                     continue;
                 }
             }
@@ -86,7 +86,7 @@ fn main() {
         }
         output
     } else {
-        node.get_as_string_tree(0, size_filter).0
+        node.get_as_string_tree(0, size_threshold).0
     };
     if reverse {
         output = output
