@@ -102,7 +102,7 @@ pub fn file_size_to_str(size: u64) -> String {
 pub fn str_to_file_size(input: &str) -> Result<u64, String> {
     let value;
     let mut exponent = 0;
-    let pos = input.find(|c: char| !c.is_digit(10));
+    let pos = input.find(|c: char| c.is_ascii_alphabetic());
     if let Some(pos) = pos {
         let (value_s, unit) = input.split_at(pos);
         exponent = match unit.to_uppercase().as_str() {
