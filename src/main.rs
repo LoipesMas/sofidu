@@ -50,6 +50,7 @@ fn main() {
                 .short("t"),
         );
 
+    // Get argument matches
     let matches = app.get_matches();
     let depth_input = matches.value_of("depth").unwrap();
     let depth = parse_depth(depth_input);
@@ -68,17 +69,21 @@ fn main() {
         }
     });
 
+    // Check if path is valid
     let path = Path::new(path_str);
     if !path.exists() || !path.is_dir() {
         println!("Invalid path provided: {}", path_str);
         std::process::exit(1);
     }
 
+    // Do the magic
     let mut node = sofidu::walk_dir(path, depth, false);
+
     if sort {
         node.sort();
     }
     let mut output = if list {
+        // Display as list
         let mut output = "".to_owned();
         let nodes = node.flatten();
         for node in nodes {
@@ -92,9 +97,11 @@ fn main() {
         }
         output
     } else {
+        // Display as tree
         node.get_as_string_tree(0, size_threshold).0
     };
     if reverse {
+        // Not sure if this can be more concise
         output = output
             .lines()
             .rev()
@@ -104,6 +111,7 @@ fn main() {
     println!("{}", output);
 }
 
+/// Parses depth a from str
 fn parse_depth(input: &str) -> i32 {
     let mut depth = {
         if let Ok(depth) = input.parse::<i32>() {
