@@ -4,7 +4,13 @@ use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_v
 use std::path::Path;
 
 fn main() {
+    let clap_color_setting = if std::env::var_os("NO_COLOR").is_none() {
+        clap::AppSettings::ColoredHelp
+    } else {
+        clap::AppSettings::ColorNever
+    };
     let app = app_from_crate!()
+        .setting(clap_color_setting)
         .arg(
             Arg::with_name("path")
                 .help("Path to directory to walk. Current directory by default.")
