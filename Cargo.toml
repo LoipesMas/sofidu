@@ -10,3 +10,4 @@ description = "An alternative to du, that lets you sort and filter the results"
 [dependencies]
 clap = "2.34.0"
 colored = "2.0.0"
+rayon = "1.5.1"

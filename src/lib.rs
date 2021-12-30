@@ -1,4 +1,5 @@
 use colored::*;
+use rayon::prelude::*;
 use std::fmt;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
@@ -54,21 +55,32 @@ impl Node {
         let mut result = "| ".repeat(depth);
         result += &self.get_as_string_line(depth == 0);
         result += "\n";
-        for child in &self.children {
-            let child_res = child.get_as_string_tree(depth + 1, size_filter);
-            if let Some(size_filter) = size_filter {
-                if child_res.1 {
-                    result += &child_res.0;
-                    passed_filter = true;
-                } else if child.size >= size_filter {
-                    result +=
-                        &("| ".repeat(depth + 1) + " " + &child.get_as_string_line(false) + "\n");
-                    passed_filter = true;
+        let (results, passed_filters): (Vec<_>, Vec<_>) = self
+            .children
+            .par_iter()
+            .map(|child| {
+                let child_res = child.get_as_string_tree(depth + 1, size_filter);
+                let mut child_out = "".to_owned();
+                let mut passed_filter = false;
+                if let Some(size_filter) = size_filter {
+                    if child_res.1 {
+                        child_out += &child_res.0;
+                        passed_filter = true;
+                    } else if child.size >= size_filter {
+                        child_out += &("| ".repeat(depth + 1)
+                            + " "
+                            + &child.get_as_string_line(false)
+                            + "\n");
+                        passed_filter = true;
+                    }
+                } else {
+                    child_out += &child_res.0;
                 }
-            } else {
-                result += &child_res.0;
-            }
-        }
+                (child_out, passed_filter)
+            })
+            .unzip();
+        result = results.iter().fold(result, |fold, r| fold + r);
+        passed_filter |= passed_filters.par_iter().any(|&p| p);
         (result, passed_filter)
     }
     pub fn flatten(&self) -> Vec<Node> {
@@ -100,23 +112,40 @@ pub fn walk_dir(path: &Path, depth: i32, follow_symlinks: bool) -> Node {
     let mut nodes: Vec<Node> = vec![];
     let mut total_size = path.metadata().map(|m| m.size()).unwrap_or(0);
     if let Ok(entries) = path.read_dir() {
-        for entry in entries.flatten() {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_dir() {
-                    let node = walk_dir(&entry.path(), depth - 1, follow_symlinks);
-                    total_size += node.size;
-                    if depth > 0 {
-                        nodes.push(node);
+        let (children, sizes): (Vec<_>, Vec<_>) = entries
+            .into_iter()
+            .par_bridge()
+            .filter_map(|entry| {
+                let mut node = None;
+                let mut size = None;
+                if let Ok(ref entry) = entry {
+                    if let Ok(file_type) = entry.file_type() {
+                        if file_type.is_dir() {
+                            let node_temp = walk_dir(&entry.path(), depth - 1, follow_symlinks);
+                            size = Some(node_temp.size);
+                            if depth > 0 {
+                                node = Some(node_temp);
+                            }
+                        } else if file_type.is_file() {
+                            let size_temp = entry.metadata().map(|m| m.size()).unwrap_or(0);
+                            size = Some(size_temp);
+                            if depth > 0 {
+                                node = Some(Node::new(entry.path(), size_temp, vec![]));
+                            }
+                        }
                     }
-                } else if file_type.is_file() {
-                    let size = entry.metadata().map(|m| m.size()).unwrap_or(0);
-                    total_size += size;
-                    if depth > 0 {
-                        nodes.push(Node::new(entry.path(), size, vec![]));
-                    }
+                };
+                if node.is_some() || size.is_some() {
+                    Some((node, size))
+                } else {
+                    None
                 }
-            }
-        }
+            })
+            .unzip();
+        children.into_iter().flatten().for_each(|child| {
+            nodes.push(child);
+        });
+        total_size += sizes.into_par_iter().flatten().sum::<u64>();
     };
     Node::new(path.to_path_buf(), total_size, nodes)
 }
