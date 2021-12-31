@@ -43,9 +43,17 @@ fn main() {
                 .short("l"),
         )
         .arg(
-            Arg::with_name("size threshold")
-                .help("Only show files with size bigger than this")
-                .long("size_threshold")
+            Arg::with_name("only files")
+                .help("Display only files")
+                .long("only_files")
+                .requires("list")
+                .short("f"),
+        )
+        .arg(
+            Arg::with_name("threshold")
+                .value_name("thresh")
+                .help("Only show files with size bigger than this (only for list view)")
+                .long("threshold")
                 .takes_value(true)
                 .short("t"),
         );
@@ -57,8 +65,9 @@ fn main() {
     let path_str = matches.value_of("path").unwrap();
     let sort = matches.is_present("sort");
     let list = matches.is_present("list");
+    let only_files = matches.is_present("only files");
     let reverse = matches.is_present("reverse");
-    let size_threshold = matches.value_of("size threshold").map(|a| {
+    let size_threshold = matches.value_of("threshold").map(|a| {
         let r = sofidu::str_to_file_size(a);
         match r {
             Ok(v) => v,
@@ -87,6 +96,9 @@ fn main() {
         let mut output = "".to_owned();
         let nodes = node.flatten();
         for node in nodes {
+            if only_files && node.is_dir {
+                continue;
+            }
             if let Some(size_threshold) = size_threshold {
                 if node.size < size_threshold {
                     continue;
