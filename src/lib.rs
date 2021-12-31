@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 /// Represents a file or a directory
 /// `size` for directories is computed at creation
 /// `children` is a vec of nodes which are inside this directory (empty for non-dirs)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node {
     pub path: PathBuf,
     pub size: u64,
@@ -176,6 +176,7 @@ pub fn walk_dir(path: &Path, depth: i32, follow_symlinks: bool) -> Node {
                 }
             })
             .unzip(); // Vec of tuples to tuple of vecs
+
         // Append all new children
         children.into_iter().flatten().for_each(|child| {
             nodes.push(child);
@@ -234,4 +235,75 @@ pub fn str_to_file_size(input: &str) -> Result<u64, String> {
     }
 
     Ok((value * 1000u64.pow(exponent) as f32) as u64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn file_size_to_str_test() {
+        assert_eq!("1B", file_size_to_str(1));
+        assert_eq!("999B", file_size_to_str(999));
+        assert_eq!("1.0KB", file_size_to_str(1_000));
+        assert_eq!("2.1KB", file_size_to_str(2_100));
+        assert_eq!("1.0MB", file_size_to_str(1_000_000));
+        assert_eq!("4.2MB", file_size_to_str(4_233_333));
+        assert_eq!("5.0GB", file_size_to_str(5_000_000_000));
+    }
+
+    #[test]
+    fn str_to_file_size_test() {
+        assert_eq!(1, str_to_file_size("1").unwrap());
+        assert_eq!(1, str_to_file_size("1.1").unwrap());
+        assert_eq!(999, str_to_file_size("999B").unwrap());
+        assert_eq!(1_000, str_to_file_size("1KB").unwrap());
+        assert_eq!(1_000, str_to_file_size("1K").unwrap());
+        assert_eq!(1_000, str_to_file_size("1.0KB").unwrap());
+        assert_eq!(1_000, str_to_file_size("1.0K").unwrap());
+        assert_eq!(4_200, str_to_file_size("4.2KB").unwrap());
+        assert_eq!(1_000_000, str_to_file_size("1.0MB").unwrap());
+        assert_eq!(1_000_000, str_to_file_size("1.0M").unwrap());
+        assert_eq!(4_200_000, str_to_file_size("4.2MB").unwrap());
+        assert_eq!(5_000_000_000, str_to_file_size("5.0GB").unwrap());
+        assert_eq!(5_000_000_000, str_to_file_size("5.0G").unwrap());
+        assert!(str_to_file_size("5..GB").is_err());
+        assert!(str_to_file_size("5..TB").is_err());
+        assert!(str_to_file_size("").is_err());
+    }
+
+    #[test]
+    fn node_sort_test() {
+        let node_1 = Node::new(PathBuf::from("foo"), 0, vec![]);
+        let node_2 = Node::new(PathBuf::from("bar"), 1, vec![]);
+        let node_3 = Node::new(PathBuf::from("baz"), 100, vec![]);
+        let children = vec![node_1.clone(), node_3.clone(), node_2.clone()];
+
+        let mut node = Node::new(PathBuf::from("quaz"), 0, children);
+
+        node.sort();
+
+        let children_out = vec![node_3, node_2, node_1];
+        assert_eq!(children_out, node.children);
+    }
+
+    #[test]
+    fn node_sort_test_recursive() {
+        let node_1 = Node::new(PathBuf::from("foo"), 0, vec![]);
+        let node_2 = Node::new(PathBuf::from("bar"), 1, vec![]);
+        let mut node_3 = Node::new(
+            PathBuf::from("baz"),
+            100,
+            vec![node_1.clone_childless(), node_2.clone_childless()],
+        );
+
+        let children = vec![node_1.clone(), node_3.clone(), node_2.clone()];
+        node_3.sort();
+
+        let mut node = Node::new(PathBuf::from("quaz"), 0, children);
+
+        let children_out = vec![node_3, node_2, node_1];
+        node.sort();
+
+        assert_eq!(children_out, node.children);
+    }
 }
