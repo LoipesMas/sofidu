@@ -1,6 +1,8 @@
 # sofidu
 An alternative to du(1), that lets you sort and filter the results.  
 Created because I needed something like this and wanted to test my rust skills.
+
+---  
 ![image](https://user-images.githubusercontent.com/46327403/147833329-15660fbb-fd40-48ba-8621-41581f2d9e70.png)
 
 
