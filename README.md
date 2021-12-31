@@ -1,4 +1,5 @@
 # sofidu
+[![Build and test](https://github.com/LoipesMas/sofidu/actions/workflows/rust.yml/badge.svg)](https://github.com/LoipesMas/sofidu/actions/workflows/rust.yml)  
 An alternative to du(1), that lets you sort and filter the results.  
 Created because I needed something like this and wanted to test my rust skills.
 
