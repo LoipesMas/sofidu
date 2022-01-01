@@ -43,6 +43,12 @@ fn main() {
                 .short("l"),
         )
         .arg(
+            Arg::with_name("machine")
+                .help("Display sizes in bytes (\"machine readable\")")
+                .long("machine-readable")
+                .short("m"),
+        )
+        .arg(
             Arg::with_name("only files")
                 .help("Display only files")
                 .long("only_files")
@@ -66,6 +72,7 @@ fn main() {
     let sort = matches.is_present("sort");
     let list = matches.is_present("list");
     let only_files = matches.is_present("only files");
+    let machine = matches.is_present("machine");
     let reverse = matches.is_present("reverse");
     let size_threshold = matches.value_of("threshold").map(|a| {
         let r = sofidu::str_to_file_size(a);
@@ -104,13 +111,13 @@ fn main() {
                     continue;
                 }
             }
-            output += &node.get_as_string_line(true);
+            output += &node.get_as_string_line(true, machine);
             output += "\n";
         }
         output
     } else {
         // Display as tree
-        node.get_as_string_tree(0, size_threshold).0
+        node.get_as_string_tree(0, size_threshold, machine).0
     };
     if reverse {
         // Not sure if this can be more concise

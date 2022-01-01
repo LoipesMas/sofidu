@@ -17,7 +17,7 @@ pub struct Node {
 
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.get_as_string_tree(0, None).0)
+        write!(f, "{}", self.get_as_string_tree(0, None, false).0)
     }
 }
 
@@ -33,7 +33,7 @@ impl Node {
 
     /// Gets a single line display for this node.
     /// Includes filename or full path, and size
-    pub fn get_as_string_line(&self, full_path: bool) -> String {
+    pub fn get_as_string_line(&self, full_path: bool, machine_readable: bool) -> String {
         let string = if full_path {
             self.path.to_str().unwrap_or("??")
         } else {
@@ -50,13 +50,24 @@ impl Node {
         } else {
             string.cyan()
         };
-        string.to_string() + " " + &file_size_to_str(self.size).green().to_string()
+        let file_size_str = if machine_readable {
+            self.size.to_string()
+        } else {
+            file_size_to_str(self.size)
+        }
+        .green();
+        string.to_string() + " " + &file_size_str.to_string()
     }
 
     /// Gets a recursive tree display for this node
     /// Returns the output string and bool representing whether this should pass the filter
     /// (threshold), so all the parent nodes should pass the filter too.
-    pub fn get_as_string_tree(&self, depth: usize, size_threshold: Option<u64>) -> (String, bool) {
+    pub fn get_as_string_tree(
+        &self,
+        depth: usize,
+        size_threshold: Option<u64>,
+        machine_readable: bool,
+    ) -> (String, bool) {
         let mut passed_threshold = if let Some(size_threshold) = size_threshold {
             self.size >= size_threshold
         } else {
@@ -66,7 +77,7 @@ impl Node {
         // This is display indentation, could be replaced with something prettier
         let mut result = "| ".repeat(depth);
 
-        result += &self.get_as_string_line(depth == 0);
+        result += &self.get_as_string_line(depth == 0, machine_readable);
         result += "\n";
 
         // This part is kinda wacky, but it had to be for parallelism
@@ -74,7 +85,8 @@ impl Node {
             .children
             .par_iter()
             .map(|child| {
-                let child_res = child.get_as_string_tree(depth + 1, size_threshold);
+                let child_res =
+                    child.get_as_string_tree(depth + 1, size_threshold, machine_readable);
                 let mut child_out = "".to_owned();
                 let mut passed_threshold = false;
                 if let Some(size_threshold) = size_threshold {
@@ -88,7 +100,7 @@ impl Node {
                         child_out += &format!(
                             "{} {}\n",
                             "| ".repeat(depth + 1),
-                            child.get_as_string_line(false)
+                            child.get_as_string_line(false, machine_readable)
                         );
                         passed_threshold = true;
                     }
@@ -312,7 +324,17 @@ mod lib_tests {
         // Disable coloring
         colored::control::set_override(false);
         let node = Node::new(PathBuf::from("foo"), 3_233_333, vec![]);
-        assert_eq!("foo 3.2MB", node.get_as_string_line(false));
+        assert_eq!("foo 3.2MB", node.get_as_string_line(false, false));
+    }
+
+    #[test]
+    fn node_as_string_line_test_machine_readable() {
+        // Disable coloring
+        colored::control::set_override(false);
+        let node = Node::new(PathBuf::from("foo"), 3_233_333, vec![]);
+        assert_eq!("foo 3233333", node.get_as_string_line(false, true));
+        let node = Node::new(PathBuf::from("foo"), 3, vec![]);
+        assert_eq!("foo 3", node.get_as_string_line(false, true));
     }
 
     #[test]
@@ -325,7 +347,7 @@ mod lib_tests {
 
         assert_eq!(
             "foo 3.2MB\n| bar 333B\n| | biz 4.3KB\n| baz 3.0GB\n",
-            node_top.get_as_string_tree(0, None).0
+            node_top.get_as_string_tree(0, None, false).0
         );
     }
 }
