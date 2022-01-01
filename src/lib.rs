@@ -26,7 +26,12 @@ impl Node {
 
     /// Gets a single line display for this node.
     /// Includes filename or full path, and size
-    pub fn get_as_string_line(&self, full_path: bool, machine_readable: bool) -> String {
+    pub fn get_as_string_line(
+        &self,
+        full_path: bool,
+        machine_readable: bool,
+        parent_size: Option<u64>,
+    ) -> String {
         let string = if full_path {
             self.path.to_str().unwrap_or("??")
         } else {
@@ -49,7 +54,26 @@ impl Node {
             file_size_to_str(self.size)
         }
         .green();
-        string.to_string() + " " + &file_size_str.to_string()
+
+        let percentage_string = if let Some(parent_size) = parent_size {
+            assert_ne!(
+                0, parent_size,
+                "Parent size is 0, while trying to get size as percentage"
+            );
+            let percentage = (self.size as f32 / parent_size as f32) * 100.0;
+            let string = format!(" {:.1}%", percentage);
+            if percentage > 30.0 {
+                string.red().bold()
+            } else if percentage > 16.0 {
+                string.bright_red()
+            } else {
+                string.white()
+            }
+            .to_string()
+        } else {
+            "".to_string()
+        };
+        string.to_string() + " " + &file_size_str.to_string() + &percentage_string
     }
 
     /// Gets a recursive tree display for this node
@@ -60,6 +84,7 @@ impl Node {
         depth: usize,
         size_threshold: Option<u64>,
         machine_readable: bool,
+        parent_size: Option<u64>,
     ) -> (String, bool) {
         let mut passed_threshold = if let Some(size_threshold) = size_threshold {
             self.size >= size_threshold
@@ -70,7 +95,7 @@ impl Node {
         // This is display indentation, could be replaced with something prettier
         let mut result = "| ".repeat(depth);
 
-        result += &self.get_as_string_line(depth == 0, machine_readable);
+        result += &self.get_as_string_line(depth == 0, machine_readable, parent_size);
         result += "\n";
 
         // This part is kinda wacky, but it had to be for parallelism
@@ -78,8 +103,12 @@ impl Node {
             .children
             .par_iter()
             .map(|child| {
-                let child_res =
-                    child.get_as_string_tree(depth + 1, size_threshold, machine_readable);
+                let child_res = child.get_as_string_tree(
+                    depth + 1,
+                    size_threshold,
+                    machine_readable,
+                    Some(self.size),
+                );
                 let mut child_out = "".to_owned();
                 let mut passed_threshold = false;
                 if let Some(size_threshold) = size_threshold {
@@ -93,7 +122,7 @@ impl Node {
                         child_out += &format!(
                             "{} {}\n",
                             "| ".repeat(depth + 1),
-                            child.get_as_string_line(false, machine_readable)
+                            child.get_as_string_line(false, machine_readable, Some(self.size))
                         );
                         passed_threshold = true;
                     }
@@ -317,11 +346,14 @@ mod lib_tests {
         // Disable coloring
         colored::control::set_override(false);
         let node = Node::new(PathBuf::from("foo"), 3_233_333, vec![]);
-        assert_eq!("foo 3.2MB", node.get_as_string_line(false, false));
+        assert_eq!("foo 3.2MB", node.get_as_string_line(false, false, None));
         let node = Node::new(PathBuf::from("src"), 3_233_333, vec![]);
-        assert_eq!("src/ 3.2MB", node.get_as_string_line(false, false));
+        assert_eq!("src/ 3.2MB", node.get_as_string_line(false, false, None));
         let node = Node::new(PathBuf::from("src/main.rs"), 3_233_333, vec![]);
-        assert_eq!("src/main.rs 3.2MB", node.get_as_string_line(true, false));
+        assert_eq!(
+            "src/main.rs 3.2MB",
+            node.get_as_string_line(true, false, None)
+        );
     }
 
     #[test]
@@ -329,31 +361,33 @@ mod lib_tests {
         // Disable coloring
         colored::control::set_override(false);
         let node = Node::new(PathBuf::from("foo"), 3_233_333, vec![]);
-        assert_eq!("foo 3233333", node.get_as_string_line(false, true));
+        assert_eq!("foo 3233333", node.get_as_string_line(false, true, None));
         let node = Node::new(PathBuf::from("foo"), 3, vec![]);
-        assert_eq!("foo 3", node.get_as_string_line(false, true));
+        assert_eq!("foo 3", node.get_as_string_line(false, true, None));
     }
 
     #[test]
     fn node_as_string_tree_test() {
         colored::control::set_override(false);
-        let node_1_1 = Node::new(PathBuf::from("foo/bar/biz"), 4_333, vec![]);
-        let node_1 = Node::new(PathBuf::from("foo/bar"), 333, vec![node_1_1]);
-        let node_2_1 = Node::new(PathBuf::from("foo/baz/qiz"), 3_222_233_333, vec![]);
-        let node_2 = Node::new(PathBuf::from("foo/baz"), 233_333, vec![node_2_1]);
-        let node_top = Node::new(PathBuf::from("foo"), 3_233_333, vec![node_1, node_2]);
+        let node_1_1 = Node::new(PathBuf::from("foo/bar/biz"), 333, vec![]);
+        let node_1 = Node::new(PathBuf::from("foo/bar"), 4_333, vec![node_1_1]);
+        let node_2_1 = Node::new(PathBuf::from("foo/baz/qiz"), 1_233_333, vec![]);
+        let node_2 = Node::new(PathBuf::from("foo/baz"), 2_233_333, vec![node_2_1]);
+        let node_top = Node::new(PathBuf::from("foo"), 3_666_233_333, vec![node_1, node_2]);
 
         assert_eq!(
-            "foo 3.2MB\n| bar 333B\n| | biz 4.3KB\n| baz 233.3KB\n| | qiz 3.2GB\n",
-            node_top.get_as_string_tree(0, None, false).0
+            "foo 3.7GB\n| bar 4.3KB 0.0%\n| | biz 333B 7.7%\n| baz 2.2MB 0.1%\n| | qiz 1.2MB 55.2%\n",
+            node_top.get_as_string_tree(0, None, false, None).0
         );
         assert_eq!(
-            "foo 3.2MB\n| baz 233.3KB\n| | qiz 3.2GB\n",
-            node_top.get_as_string_tree(0, Some(3_000_000), false).0
+            "foo 3.7GB\n| baz 2.2MB 0.1%\n| | qiz 1.2MB 55.2%\n",
+            node_top
+                .get_as_string_tree(0, Some(1_000_000), false, None)
+                .0
         );
         assert_eq!(
-            "foo 3.2MB\n| baz 233.3KB\n| | qiz 3.2GB\n",
-            node_top.get_as_string_tree(0, Some(200_000), false).0
+            "foo 3.7GB\n| bar 4.3KB 0.0%\n| baz 2.2MB 0.1%\n| | qiz 1.2MB 55.2%\n",
+            node_top.get_as_string_tree(0, Some(4_000), false, None).0
         );
     }
 

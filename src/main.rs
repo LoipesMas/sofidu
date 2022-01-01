@@ -117,13 +117,13 @@ fn main() {
                     continue;
                 }
             }
-            output += &node.get_as_string_line(true, machine);
+            output += &node.get_as_string_line(true, machine, None);
             output += "\n";
         }
         output
     } else {
         // Display as tree
-        node.get_as_string_tree(0, size_threshold, machine).0
+        node.get_as_string_tree(0, size_threshold, machine, None).0
     };
     if reverse {
         // Not sure if this can be more concise
