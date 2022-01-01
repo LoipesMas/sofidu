@@ -73,7 +73,7 @@ impl Node {
         } else {
             "".to_string()
         };
-        string.to_string() + " " + &file_size_str.to_string() + &percentage_string
+        format!("{} {}{}", string, file_size_str, percentage_string)
     }
 
     /// Gets a recursive tree display for this node
@@ -93,10 +93,11 @@ impl Node {
         };
 
         // This is display indentation, could be replaced with something prettier
-        let mut result = "| ".repeat(depth);
-
-        result += &self.get_as_string_line(depth == 0, machine_readable, parent_size);
-        result += "\n";
+        let mut result = format!(
+            "{}{}\n",
+            "| ".repeat(depth),
+            &self.get_as_string_line(depth == 0, machine_readable, parent_size)
+        );
 
         // This part is kinda wacky, but it had to be for parallelism
         let (results, passed_thresholds): (Vec<_>, Vec<_>) = self
