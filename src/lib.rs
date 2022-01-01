@@ -1,6 +1,5 @@
 use colored::*;
 use rayon::prelude::*;
-use std::fmt;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
@@ -13,12 +12,6 @@ pub struct Node {
     pub size: u64,
     pub children: Vec<Node>,
     pub is_dir: bool,
-}
-
-impl fmt::Display for Node {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.get_as_string_tree(0, None, false).0)
-    }
 }
 
 impl Node {
@@ -349,5 +342,34 @@ mod lib_tests {
             "foo 3.2MB\n| bar 333B\n| | biz 4.3KB\n| baz 3.0GB\n",
             node_top.get_as_string_tree(0, None, false).0
         );
+    }
+
+    #[test]
+    fn node_flatten_test() {
+        let node_1_1 = Node::new(PathBuf::from("foo/bar/biz"), 4_333, vec![]);
+        let node_1 = Node::new(PathBuf::from("foo/bar"), 333, vec![node_1_1.clone()]);
+        let node_2 = Node::new(PathBuf::from("foo/baz"), 3_000_233_333, vec![]);
+        let node_top = Node::new(
+            PathBuf::from("foo"),
+            3_233_333,
+            vec![node_1.clone(), node_2.clone()],
+        );
+        let result = vec![
+            node_top.clone_childless(),
+            node_1.clone_childless(),
+            node_1_1.clone_childless(),
+            node_2.clone_childless(),
+        ];
+        assert_eq!(result, node_top.flatten());
+    }
+
+    #[test]
+    fn node_clone_childless_test() {
+        let node_1_1 = Node::new(PathBuf::from("foo/bar/biz"), 4_333, vec![]);
+        let node_1 = Node::new(PathBuf::from("foo/bar"), 333, vec![node_1_1]);
+        let node_2 = Node::new(PathBuf::from("foo/baz"), 3_000_233_333, vec![]);
+        let node_top = Node::new(PathBuf::from("foo"), 3_233_333, vec![node_1, node_2]);
+
+        assert_eq!(Vec::<Node>::new(), node_top.clone_childless().children);
     }
 }
