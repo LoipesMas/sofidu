@@ -17,5 +17,4 @@ Created because I needed something like this and wanted to test my rust skills.
 
 ### TODO:
 - More tests
-- Windows support
 - More features? (need ideas)

@@ -1,6 +1,5 @@
 use colored::*;
 use rayon::prelude::*;
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 /// Represents a file or a directory
@@ -55,23 +54,23 @@ impl Node {
         }
         .green();
 
-        let percentage_string = if let Some(parent_size) = parent_size {
-            assert_ne!(
-                0, parent_size,
-                "Parent size is 0, while trying to get size as percentage"
-            );
-            let percentage = (self.size as f32 / parent_size as f32) * 100.0;
-            let string = format!(" {:.1}%", percentage);
-            if percentage > 30.0 {
-                string.red().bold()
-            } else if percentage > 16.0 {
-                string.bright_red()
-            } else {
-                string.white()
+        let percentage_string = match parent_size {
+            None => "".to_string(),
+            Some(parent_size) => {
+                let percentage = match parent_size {
+                    0 => 100.0, // If parent size is zero, just display 💯
+                    v => (self.size as f32 / v as f32) * 100.0,
+                };
+                let string = format!(" {:.1}%", percentage);
+                if percentage > 30.0 {
+                    string.red().bold()
+                } else if percentage > 16.0 {
+                    string.bright_red()
+                } else {
+                    string.white()
+                }
+                .to_string()
             }
-            .to_string()
-        } else {
-            "".to_string()
         };
         format!("{} {}{}", string, file_size_str, percentage_string)
     }
@@ -171,8 +170,9 @@ impl Node {
 /// Walks a directory recursively, creating nodes along the way
 pub fn walk_dir(path: &Path, depth: i32, follow_symlinks: bool) -> Node {
     let mut nodes: Vec<Node> = vec![];
-    // Try to get size, currently unix only
-    let mut total_size = path.metadata().map(|m| m.size()).unwrap_or(0);
+
+    let mut total_size = path.metadata().map(|m| m.len()).unwrap_or(0);
+
     if let Ok(entries) = path.read_dir() {
         // Walk over children
         let (children, sizes): (Vec<_>, Vec<_>) = entries
@@ -193,7 +193,7 @@ pub fn walk_dir(path: &Path, depth: i32, follow_symlinks: bool) -> Node {
                             }
                         } else if file_type.is_file() {
                             // Get size for this file
-                            let size_temp = entry.metadata().map(|m| m.size()).unwrap_or(0);
+                            let size_temp = entry.metadata().map(|m| m.len()).unwrap_or(0);
                             size = Some(size_temp);
                             if depth > 0 {
                                 // If not too deep, store it
