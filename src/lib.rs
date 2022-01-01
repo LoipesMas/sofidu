@@ -318,6 +318,10 @@ mod lib_tests {
         colored::control::set_override(false);
         let node = Node::new(PathBuf::from("foo"), 3_233_333, vec![]);
         assert_eq!("foo 3.2MB", node.get_as_string_line(false, false));
+        let node = Node::new(PathBuf::from("src"), 3_233_333, vec![]);
+        assert_eq!("src/ 3.2MB", node.get_as_string_line(false, false));
+        let node = Node::new(PathBuf::from("src/main.rs"), 3_233_333, vec![]);
+        assert_eq!("src/main.rs 3.2MB", node.get_as_string_line(true, false));
     }
 
     #[test]
@@ -335,12 +339,21 @@ mod lib_tests {
         colored::control::set_override(false);
         let node_1_1 = Node::new(PathBuf::from("foo/bar/biz"), 4_333, vec![]);
         let node_1 = Node::new(PathBuf::from("foo/bar"), 333, vec![node_1_1]);
-        let node_2 = Node::new(PathBuf::from("foo/baz"), 3_000_233_333, vec![]);
+        let node_2_1 = Node::new(PathBuf::from("foo/baz/qiz"), 3_222_233_333, vec![]);
+        let node_2 = Node::new(PathBuf::from("foo/baz"), 233_333, vec![node_2_1]);
         let node_top = Node::new(PathBuf::from("foo"), 3_233_333, vec![node_1, node_2]);
 
         assert_eq!(
-            "foo 3.2MB\n| bar 333B\n| | biz 4.3KB\n| baz 3.0GB\n",
+            "foo 3.2MB\n| bar 333B\n| | biz 4.3KB\n| baz 233.3KB\n| | qiz 3.2GB\n",
             node_top.get_as_string_tree(0, None, false).0
+        );
+        assert_eq!(
+            "foo 3.2MB\n| baz 233.3KB\n| | qiz 3.2GB\n",
+            node_top.get_as_string_tree(0, Some(3_000_000), false).0
+        );
+        assert_eq!(
+            "foo 3.2MB\n| baz 233.3KB\n| | qiz 3.2GB\n",
+            node_top.get_as_string_tree(0, Some(200_000), false).0
         );
     }
 

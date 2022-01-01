@@ -67,7 +67,13 @@ fn main() {
     // Get argument matches
     let matches = app.get_matches();
     let depth_input = matches.value_of("depth").unwrap();
-    let depth = parse_depth(depth_input);
+    let depth = match parse_depth(depth_input) {
+        Ok(v) => v,
+        Err(m) => {
+            println!("{}", m);
+            std::process::exit(1)
+        }
+    };
     let path_str = matches.value_of("path").unwrap();
     let sort = matches.is_present("sort");
     let list = matches.is_present("list");
@@ -131,24 +137,34 @@ fn main() {
 }
 
 /// Parses depth a from str
-fn parse_depth(input: &str) -> i32 {
+fn parse_depth(input: &str) -> Result<i32, String> {
     let mut depth = {
         if let Ok(depth) = input.parse::<i32>() {
             depth
         } else {
-            println!(
+            return Err(format!(
                 "Invalid depth provided, expected integer value, got '{}'",
                 input
-            );
-            std::process::exit(1)
+            ));
         }
     };
     if depth < -1 {
-        println!("Depth must be 0 or greater or -1 for max depth");
-        std::process::exit(1)
+        return Err("Depth must be 0 or greater or -1 for max depth".to_string());
     }
     if depth == -1 {
         depth = i32::MAX;
     }
-    depth
+    Ok(depth)
+}
+
+#[cfg(test)]
+mod main_tests {
+    use super::*;
+    #[test]
+    fn parse_depth_test() {
+        assert_eq!(i32::MAX, parse_depth("-1").unwrap());
+        assert_eq!(1, parse_depth("1").unwrap());
+        assert!(parse_depth("-2").is_err());
+        assert!(parse_depth("foo").is_err());
+    }
 }
