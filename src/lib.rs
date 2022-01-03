@@ -2,6 +2,9 @@ use colored::*;
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
+use clap::Arg;
+use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};
+
 /// Represents a file or a directory
 /// `size` for directories is computed at creation
 /// `children` is a vec of nodes which are inside this directory (empty for non-dirs)
@@ -222,6 +225,148 @@ pub fn walk_dir(path: &Path, depth: i32, follow_symlinks: bool) -> Node {
     Node::new(path.to_path_buf(), total_size, nodes)
 }
 
+pub struct AppSettings {
+    pub path: PathBuf,
+    pub depth: i32,
+    pub sort: bool,
+    pub reverse: bool,
+    pub list: bool,
+    pub machine: bool,
+    pub only_files: bool,
+    pub threshold: Option<u64>,
+}
+
+impl AppSettings {
+    /// Parses arguments using clap to AppSettings
+    pub fn from_args(args: Vec<String>) -> Self {
+        let clap_color_setting = if std::env::var_os("NO_COLOR").is_none() {
+            clap::AppSettings::ColoredHelp
+        } else {
+            clap::AppSettings::ColorNever
+        };
+        let app = app_from_crate!()
+            .setting(clap_color_setting)
+            .arg(
+                Arg::with_name("path")
+                    .help("Path to directory to walk. Current directory by default.")
+                    .default_value("."),
+            )
+            .arg(
+                Arg::with_name("depth")
+                    .help("Depth of displayed tree/list")
+                    .long("depth")
+                    .default_value("-1")
+                    .takes_value(true)
+                    .short("d"),
+            )
+            .arg(
+                Arg::with_name("sort")
+                    .help("Sort entries by size")
+                    .long("sort")
+                    .short("s"),
+            )
+            .arg(
+                Arg::with_name("reverse")
+                    .help("Reverse the output")
+                    .long("reverse")
+                    .short("r"),
+            )
+            .arg(
+                Arg::with_name("list")
+                    .help("Display entries as a list instead of a tree")
+                    .long("list")
+                    .short("l"),
+            )
+            .arg(
+                Arg::with_name("machine")
+                    .help("Display sizes in bytes (\"machine readable\")")
+                    .long("machine-readable")
+                    .short("m"),
+            )
+            .arg(
+                Arg::with_name("only files")
+                    .help("Display only files")
+                    .long("only_files")
+                    .requires("list")
+                    .short("f"),
+            )
+            .arg(
+                Arg::with_name("threshold")
+                    .value_name("thresh")
+                    .help("Only show files with size bigger than this (only for list view)")
+                    .long("threshold")
+                    .takes_value(true)
+                    .short("t"),
+            );
+
+        // Get argument matches
+        let matches = app.get_matches_from(args);
+        let depth_input = matches.value_of("depth").unwrap();
+        let depth = match parse_depth(depth_input) {
+            Ok(v) => v,
+            Err(m) => {
+                println!("{}", m);
+                std::process::exit(1)
+            }
+        };
+        let path_str = matches.value_of("path").unwrap();
+        let sort = matches.is_present("sort");
+        let list = matches.is_present("list");
+        let only_files = matches.is_present("only files");
+        let machine = matches.is_present("machine");
+        let reverse = matches.is_present("reverse");
+        let threshold = matches.value_of("threshold").map(|a| {
+            let r = str_to_file_size(a);
+            match r {
+                Ok(v) => v,
+                Err(m) => {
+                    println!("{}", m);
+                    std::process::exit(1)
+                }
+            }
+        });
+
+        // Check if path is valid
+        let path = PathBuf::from(path_str);
+        if !path.exists() || !path.is_dir() {
+            println!("Invalid path provided: {}", path_str);
+            std::process::exit(1);
+        }
+
+        Self {
+            path,
+            depth,
+            list,
+            sort,
+            only_files,
+            machine,
+            threshold,
+            reverse,
+        }
+    }
+}
+
+/// Parses depth a from str
+fn parse_depth(input: &str) -> Result<i32, String> {
+    let mut depth = {
+        if let Ok(depth) = input.parse::<i32>() {
+            depth
+        } else {
+            return Err(format!(
+                "Invalid depth provided, expected integer value, got '{}'",
+                input
+            ));
+        }
+    };
+    if depth < -1 {
+        return Err("Depth must be 0 or greater or -1 for max depth".to_string());
+    }
+    if depth == -1 {
+        depth = i32::MAX;
+    }
+    Ok(depth)
+}
+
 /// Converts file size in bytes to human readable string
 pub fn file_size_to_str(size: u64) -> String {
     let exp = (size as f32).log10() as u32;
@@ -419,5 +564,28 @@ mod lib_tests {
         let node_top = Node::new(PathBuf::from("foo"), 3_233_333, vec![node_1, node_2]);
 
         assert_eq!(Vec::<Node>::new(), node_top.clone_childless().children);
+    }
+
+    #[test]
+    fn parse_depth_test() {
+        assert_eq!(i32::MAX, parse_depth("-1").unwrap());
+        assert_eq!(1, parse_depth("1").unwrap());
+        assert!(parse_depth("-2").is_err());
+        assert!(parse_depth("foo").is_err());
+    }
+
+    #[test]
+    fn parse_arguments_test() {
+        let arguments = "sofidu -d 10 -s -r -l -m -f -t 1gb src";
+        let settings =
+            AppSettings::from_args(arguments.split(' ').map(|a| a.to_string()).collect());
+        assert_eq!(10, settings.depth);
+        assert!(settings.sort);
+        assert!(settings.reverse);
+        assert!(settings.list);
+        assert!(settings.machine);
+        assert!(settings.only_files);
+        assert_eq!(Some(1_000_000_000), settings.threshold);
+        assert_eq!(PathBuf::from("src"), settings.path);
     }
 }
