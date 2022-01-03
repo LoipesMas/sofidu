@@ -142,6 +142,31 @@ impl Node {
         (result, passed_threshold)
     }
 
+    /// Returns a string that lists all of the nodes,
+    /// that are subnodes of self
+    pub fn get_as_string_list(
+        &self,
+        only_files: bool,
+        size_threshold: Option<u64>,
+        machine_readable: bool,
+    ) -> String {
+        let mut output = "".to_owned();
+        let nodes = self.flatten();
+        for node in nodes {
+            if only_files && node.is_dir {
+                continue;
+            }
+            if let Some(size_threshold) = size_threshold {
+                if node.size < size_threshold {
+                    continue;
+                }
+            }
+            output += &node.get_as_string_line(true, machine_readable, None);
+            output += "\n";
+        }
+        output
+    }
+
     /// Turns a tree of nodes into a flat vec of nodes
     pub fn flatten(&self) -> Vec<Node> {
         let mut nodes = vec![self.clone_childless()];

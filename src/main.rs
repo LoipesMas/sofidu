@@ -14,21 +14,7 @@ fn main() {
     }
     let mut output = if settings.list {
         // Display as list
-        let mut output = "".to_owned();
-        let nodes = node.flatten();
-        for node in nodes {
-            if settings.only_files && node.is_dir {
-                continue;
-            }
-            if let Some(size_threshold) = settings.threshold {
-                if node.size < size_threshold {
-                    continue;
-                }
-            }
-            output += &node.get_as_string_line(true, settings.machine, None);
-            output += "\n";
-        }
-        output
+        node.get_as_string_list(settings.only_files, settings.threshold, settings.machine)
     } else {
         // Display as tree
         node.get_as_string_tree(0, settings.threshold, settings.machine, None)
