@@ -582,6 +582,28 @@ mod lib_tests {
     }
 
     #[test]
+    fn node_as_list_test() {
+        colored::control::set_override(false);
+        let node_1_1 = Node::new(PathBuf::from("foo/bar/biz"), 333, vec![]);
+        let mut node_1 = Node::new(PathBuf::from("foo/bar"), 4_333, vec![node_1_1]);
+        node_1.is_dir = true;
+        let node_2_1 = Node::new(PathBuf::from("foo/baz/qiz"), 1_233_333, vec![]);
+        let mut node_2 = Node::new(PathBuf::from("foo/baz"), 2_233_333, vec![node_2_1]);
+        node_2.is_dir = true;
+        let mut node_top = Node::new(PathBuf::from("foo"), 3_666_233_333, vec![node_1, node_2]);
+        node_top.is_dir = true;
+
+        assert_eq!(
+            "foo/ 3.7GB\nfoo/bar/ 4.3KB\nfoo/bar/biz 333B\nfoo/baz/ 2.2MB\nfoo/baz/qiz 1.2MB\n",
+            node_top.get_as_string_list(false, None, false)
+        );
+        assert_eq!(
+            "foo/bar/biz 333B\nfoo/baz/qiz 1.2MB\n",
+            node_top.get_as_string_list(true, None, false)
+        );
+    }
+
+    #[test]
     fn node_clone_childless_test() {
         let node_1_1 = Node::new(PathBuf::from("foo/bar/biz"), 4_333, vec![]);
         let node_1 = Node::new(PathBuf::from("foo/bar"), 333, vec![node_1_1]);
