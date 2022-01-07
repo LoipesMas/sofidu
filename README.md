@@ -8,7 +8,7 @@ Created because I needed something like this and wanted to test my rust skills.
 
 
 ### Current functionality:
-- Display files and folders in a tree-like structers with their sizes
+- Display files and folders in a tree-like structure with their sizes and as percentage of parent size.
 - Display them as a list (`-l`)
 - Sort by size (`-s`)(descending, or ascending with `-r`)
 - Only show files and folders which have size above given threshold (`-t`)
